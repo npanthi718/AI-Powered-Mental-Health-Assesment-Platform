@@ -1,0 +1,335 @@
+.App {
+  min-height: 100vh;
+  background: #f8fafc;
+}
+
+.dashboard-container {
+  min-height: 100vh;
+  background: #f8fafc;
+}
+
+/* Enhanced Webcam Styles */
+.webcam-container {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 4px;
+}
+
+.webcam-container video {
+  border-radius: 12px;
+  width: 100%;
+  height: auto;
+}
+
+.webcam-overlay {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  backdrop-filter: blur(8px);
+  border-radius: 12px;
+}
+
+/* Enhanced Risk Indicators */
+.risk-indicator {
+  padding: 12px 24px;
+  border-radius: 25px;
+  font-weight: 700;
+  text-align: center;
+  color: white;
+  text-transform: uppercase;
+  font-size: 1rem;
+  letter-spacing: 1px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.risk-indicator::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.risk-indicator:hover::before {
+  left: 100%;
+}
+
+.risk-low {
+  background: linear-gradient(135deg, #4caf50, #66bb6a);
+  box-shadow: 0 4px 16px rgba(76, 175, 80, 0.4);
+}
+
+.risk-moderate {
+  background: linear-gradient(135deg, #ff9800, #ffb74d);
+  box-shadow: 0 4px 16px rgba(255, 152, 0, 0.4);
+}
+
+.risk-high {
+  background: linear-gradient(135deg, #f44336, #ef5350);
+  box-shadow: 0 4px 16px rgba(244, 67, 54, 0.4);
+}
+
+/* Enhanced Assessment Cards */
+.assessment-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 16px;
+  overflow: hidden;
+  position: relative;
+}
+
+.assessment-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #1976d2, #26a69a);
+}
+
+.assessment-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+}
+
+/* Enhanced Animations */
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.05);
+  }
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, #1976d2, #26a69a);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-size: 200% 200%;
+  animation: gradientShift 3s ease infinite;
+}
+
+@keyframes gradientShift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Enhanced Stats Cards */
+.stats-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 20px;
+  padding: 32px;
+  text-align: center;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  position: relative;
+  overflow: hidden;
+}
+
+.stats-card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+  animation: rotate 20s linear infinite;
+}
+
+@keyframes rotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Enhanced Emotion Indicators */
+.emotion-indicator {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  letter-spacing: 0.5px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.emotion-indicator:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.emotion-happy {
+  background: linear-gradient(135deg, #e8f5e8, #c8e6c9);
+  color: #2e7d32;
+  border: 2px solid #4caf50;
+}
+
+.emotion-sad {
+  background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+  color: #1565c0;
+  border: 2px solid #2196f3;
+}
+
+.emotion-angry {
+  background: linear-gradient(135deg, #ffebee, #ffcdd2);
+  color: #c62828;
+  border: 2px solid #f44336;
+}
+
+.emotion-neutral {
+  background: linear-gradient(135deg, #f3e5f5, #e1bee7);
+  color: #7b1fa2;
+  border: 2px solid #9c27b0;
+}
+
+.emotion-anxious {
+  background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+  color: #ef6c00;
+  border: 2px solid #ff9800;
+}
+
+/* Enhanced Chart Container */
+.chart-container {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+.chart-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #1976d2, #26a69a, #ff9800, #4caf50);
+}
+
+/* Loading States */
+.loading-shimmer {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Responsive Enhancements */
+@media (max-width: 768px) {
+  .risk-indicator {
+    padding: 8px 16px;
+    font-size: 0.875rem;
+  }
+  
+  .stats-card {
+    padding: 20px;
+  }
+  
+  .assessment-card:hover {
+    transform: translateY(-4px);
+  }
+}
+
+/* Accessibility Enhancements */
+.focus-visible {
+  outline: 3px solid #1976d2;
+  outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .risk-indicator {
+    border: 2px solid currentColor;
+  }
+  
+  .emotion-indicator {
+    border-width: 3px;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .assessment-card,
+  .emotion-indicator,
+  .animate-pulse {
+    animation: none;
+    transition: none;
+  }
+  
+  .assessment-card:hover {
+    transform: none;
+  }
+}
+
+/* Print styles */
+@media print {
+  .chart-container {
+    box-shadow: none;
+    border: 1px solid #ccc;
+  }
+  
+  .risk-indicator {
+    background: white !important;
+    color: black !important;
+    border: 2px solid black;
+  }
+}
+
+/* Face detection animation */
+@keyframes faceDetection {
+  0%, 100% {
+    opacity: 0.3;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+}
