@@ -271,120 +271,122 @@ const ReviewSystem: React.FC = () => {
 
         {/* Recent Reviews Sidebar */}
         <Grid item xs={12} md={4}>
-          <Card sx={{ position: 'sticky', top: 20 }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 600 }}>
-                <Star sx={{ color: '#ffc107' }} />
-                Recent Community Reviews
-              </Typography>
-              
-              <Box sx={{ maxHeight: 600, overflow: 'auto' }}>
-                <List>
-                  {reviews.map((review, index) => (
-                    <React.Fragment key={review.id}>
-                      <ListItem alignItems="flex-start" sx={{ px: 0, py: 2 }}>
-                        <ListItemAvatar>
-                          <Avatar sx={{ bgcolor: 'primary.main', width: 50, height: 50 }}>
-                            {review.userName.charAt(0)}
-                          </Avatar>
-                        </ListItemAvatar>
-                        <ListItemText
-                          primary={
-                            <Box sx={{ mb: 1 }}>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                                <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                                  {review.userName}
+          <Box sx={{ position: { md: 'sticky' }, top: { md: 20 }, display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 600 }}>
+                  <Star sx={{ color: '#ffc107' }} />
+                  Recent Community Reviews
+                </Typography>
+                
+                <Box sx={{ maxHeight: 600, overflow: 'auto' }}>
+                  <List>
+                    {reviews.map((review, index) => (
+                      <React.Fragment key={review.id}>
+                        <ListItem alignItems="flex-start" sx={{ px: 0, py: 2 }}>
+                          <ListItemAvatar>
+                            <Avatar sx={{ bgcolor: 'primary.main', width: 50, height: 50 }}>
+                              {review.userName.charAt(0)}
+                            </Avatar>
+                          </ListItemAvatar>
+                          <ListItemText
+                            primary={
+                              <Box sx={{ mb: 1 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                                  <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                                    {review.userName}
+                                  </Typography>
+                                  {review.featured && <Verified sx={{ color: 'primary.main', fontSize: 18 }} />}
+                                </Box>
+                                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                  {review.userRole}
                                 </Typography>
-                                {review.featured && <Verified sx={{ color: 'primary.main', fontSize: 18 }} />}
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                  <Rating value={review.rating} size="small" readOnly />
+                                  <Typography variant="body2" color="text.secondary">
+                                    ({review.rating}/5)
+                                  </Typography>
+                                  {review.category && (
+                                    <Chip 
+                                      label={review.category} 
+                                      size="small" 
+                                      variant="outlined"
+                                      sx={{ textTransform: 'capitalize' }}
+                                    />
+                                  )}
+                                </Box>
                               </Box>
-                              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                                {review.userRole}
-                              </Typography>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                                <Rating value={review.rating} size="small" readOnly />
-                                <Typography variant="body2" color="text.secondary">
-                                  ({review.rating}/5)
+                            }
+                            secondary={
+                              <Box>
+                                <Typography variant="body2" sx={{ 
+                                  display: '-webkit-box',
+                                  WebkitLineClamp: 4,
+                                  WebkitBoxOrient: 'vertical',
+                                  overflow: 'hidden',
+                                  mb: 1,
+                                  wordWrap: 'break-word',
+                                  overflowWrap: 'break-word'
+                                }}>
+                                  "{review.comment}"
                                 </Typography>
-                                {review.category && (
-                                  <Chip 
-                                    label={review.category} 
-                                    size="small" 
-                                    variant="outlined"
-                                    sx={{ textTransform: 'capitalize' }}
-                                  />
-                                )}
+                                <Typography variant="caption" color="text.secondary">
+                                  {new Date(review.timestamp).toLocaleDateString()}
+                                </Typography>
                               </Box>
-                            </Box>
-                          }
-                          secondary={
-                            <Box>
-                              <Typography variant="body2" sx={{ 
-                                display: '-webkit-box',
-                                WebkitLineClamp: 4,
-                                WebkitBoxOrient: 'vertical',
-                                overflow: 'hidden',
-                                mb: 1,
-                                wordWrap: 'break-word',
-                                overflowWrap: 'break-word'
-                              }}>
-                                "{review.comment}"
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                {new Date(review.timestamp).toLocaleDateString()}
-                              </Typography>
-                            </Box>
-                          }
-                        />
-                      </ListItem>
-                      {index < reviews.length - 1 && <Divider variant="inset" component="li" />}
-                    </React.Fragment>
-                  ))}
-                </List>
-              </Box>
-
-              {reviews.length === 0 && (
-                <Box sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
-                  <Person sx={{ fontSize: 48, mb: 2 }} />
-                  <Typography>No reviews yet. Be the first to share your experience!</Typography>
+                            }
+                          />
+                        </ListItem>
+                        {index < reviews.length - 1 && <Divider variant="inset" component="li" />}
+                      </React.Fragment>
+                    ))}
+                  </List>
                 </Box>
-              )}
-            </CardContent>
-          </Card>
 
-          {/* Review Guidelines */}
-          <Paper sx={{ p: 3, mt: 3, bgcolor: '#f8f9fa' }}>
-            <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Comment color="primary" />
-              Review Guidelines
-            </Typography>
-            <List dense>
-              <ListItem sx={{ px: 0 }}>
-                <Typography variant="body2">
-                  ✅ Be honest and constructive in your feedback
-                </Typography>
-              </ListItem>
-              <ListItem sx={{ px: 0 }}>
-                <Typography variant="body2">
-                  🎯 Focus on your experience with the system
-                </Typography>
-              </ListItem>
-              <ListItem sx={{ px: 0 }}>
-                <Typography variant="body2">
-                  🔒 Avoid sharing personal health information
-                </Typography>
-              </ListItem>
-              <ListItem sx={{ px: 0 }}>
-                <Typography variant="body2">
-                  🤝 Help others understand the system's benefits
-                </Typography>
-              </ListItem>
-              <ListItem sx={{ px: 0 }}>
-                <Typography variant="body2">
-                  💡 Suggest improvements for future updates
-                </Typography>
-              </ListItem>
-            </List>
-          </Paper>
+                {reviews.length === 0 && (
+                  <Box sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
+                    <Person sx={{ fontSize: 48, mb: 2 }} />
+                    <Typography>No reviews yet. Be the first to share your experience!</Typography>
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Review Guidelines */}
+            <Paper sx={{ p: 3, bgcolor: '#f8f9fa' }}>
+              <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Comment color="primary" />
+                Review Guidelines
+              </Typography>
+              <List dense>
+                <ListItem sx={{ px: 0 }}>
+                  <Typography variant="body2">
+                    ✅ Be honest and constructive in your feedback
+                  </Typography>
+                </ListItem>
+                <ListItem sx={{ px: 0 }}>
+                  <Typography variant="body2">
+                    🎯 Focus on your experience with the system
+                  </Typography>
+                </ListItem>
+                <ListItem sx={{ px: 0 }}>
+                  <Typography variant="body2">
+                    🔒 Avoid sharing personal health information
+                  </Typography>
+                </ListItem>
+                <ListItem sx={{ px: 0 }}>
+                  <Typography variant="body2">
+                    🤝 Help others understand the system's benefits
+                  </Typography>
+                </ListItem>
+                <ListItem sx={{ px: 0 }}>
+                  <Typography variant="body2">
+                    💡 Suggest improvements for future updates
+                  </Typography>
+                </ListItem>
+              </List>
+            </Paper>
+          </Box>
         </Grid>
       </Grid>
     </Box>

@@ -20,17 +20,9 @@ import { Psychology, CheckCircle, Lightbulb } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
 import EmotionAnalysis from './EmotionAnalysis';
-import WellnessActivity from './WellnessActivity';
+import WellnessActivity, { ActivitySessionSummary } from './WellnessActivity';
 import AssessmentResults from './AssessmentResults';
-import { mentalHealthQuestions as fullQuestionBank, wellnessActivities, AssessmentResult } from '../../data/questionBank';
-
-const scaleOptions = [
-  { value: 1, label: 'Never/Very Poor', icon: '😞' },
-  { value: 2, label: 'Rarely/Poor', icon: '😕' },
-  { value: 3, label: 'Sometimes/Fair', icon: '😐' },
-  { value: 4, label: 'Often/Good', icon: '🙂' },
-  { value: 5, label: 'Always/Excellent', icon: '😊' }
-];
+import { mentalHealthQuestions as fullQuestionBank, wellnessActivities, AssessmentResult, getScaleOptionsForCategory, ScaleOption } from '../../data/questionBank';
 
 function pickRandom<T>(arr: T[], n: number) {
   const copy = [...arr];
@@ -53,7 +45,7 @@ const AssessmentForm: React.FC = () => {
   const [responses, setResponses] = useState<Record<string, number>>({});
   const [result, setResult] = useState<AssessmentResult | null>(null);
   const [postResult, setPostResult] = useState<AssessmentResult | null>(null);
-  const [activitySession, setActivitySession] = useState<any | null>(null);
+  const [activitySession, setActivitySession] = useState<ActivitySessionSummary | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -155,6 +147,18 @@ const AssessmentForm: React.FC = () => {
         recommendations: metrics.flatMap(m => m.recommendations)
       });
     } else {
+      if (activitySession) {
+        const previousScore = result?.overallScore ?? Math.max(0, res.overallScore - activitySession.improvement);
+        const measuredChange = (res.overallScore - previousScore) * 100;
+        const fallbackChange = activitySession.improvement * 100;
+        res.improvement = {
+          previousScore,
+          currentScore: res.overallScore,
+          changePercent: measuredChange !== 0 ? measuredChange : fallbackChange,
+          activities: activitySession.completedNames
+        };
+        res.activityMonitoring = activitySession.engagementSummary;
+      }
       setPostResult(res);
       setPhase('postResults');
       // submit post-activity assessment too
@@ -174,7 +178,7 @@ const AssessmentForm: React.FC = () => {
     setPhase('activities');
   };
 
-  const onActivitiesComplete = (session: any) => {
+  const onActivitiesComplete = (session: ActivitySessionSummary) => {
     // session contains completed activities and improvement estimate
     setActivitySession(session);
     // after activities, start postQuestions flow
@@ -220,17 +224,35 @@ const AssessmentForm: React.FC = () => {
 
             <Typography variant="h6" sx={{ mb: 3 }}>{selectedQuestions[currentIndex].question}</Typography>
 
-            <Grid container spacing={2}>
-              {scaleOptions.map(opt => (
-                <Grid item xs={12} sm={6} md={4} key={opt.value}>
-                  <Paper sx={{ p: 2, cursor: 'pointer', border: responses[selectedQuestions[currentIndex].id] === opt.value ? '2px solid #1976d2' : '1px solid #e0e0e0', bgcolor: responses[selectedQuestions[currentIndex].id] === opt.value ? '#f3f8ff' : 'white' }}
-                    onClick={() => answerCurrent(selectedQuestions[currentIndex].id, opt.value)}>
-                    <Typography variant="body1" sx={{ fontWeight: 600 }}>{opt.icon} {opt.value} - {opt.label.split('/')[0]}</Typography>
-                    <Typography variant="body2" color="text.secondary">{opt.label.split('/')[1]}</Typography>
-                  </Paper>
+            {(() => {
+              const currentQuestion = selectedQuestions[currentIndex];
+              const options: ScaleOption[] = getScaleOptionsForCategory(currentQuestion.category);
+              return (
+                <Grid container spacing={2}>
+                  {options.map(opt => (
+                    <Grid item xs={12} sm={6} md={4} key={opt.value}>
+                      <Paper
+                        sx={{
+                          p: 2,
+                          cursor: 'pointer',
+                          border: responses[currentQuestion.id] === opt.value ? '2px solid #1976d2' : '1px solid #e0e0e0',
+                          bgcolor: responses[currentQuestion.id] === opt.value ? '#f3f8ff' : 'white',
+                          height: '100%'
+                        }}
+                        onClick={() => answerCurrent(currentQuestion.id, opt.value)}
+                      >
+                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                          {opt.icon} {opt.label}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {opt.description}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  ))}
                 </Grid>
-              ))}
-            </Grid>
+              );
+            })()}
 
             <Box sx={{ mt: 4, textAlign: 'center' }}>
               <Typography variant="body2" color="text.secondary">Answers will auto-advance after selection</Typography>
@@ -263,18 +285,67 @@ const AssessmentForm: React.FC = () => {
             <Typography variant="h6" sx={{ mb: 2 }}>Post-Activity Re-Assessment</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>Answer these 10 quick questions to measure improvement</Typography>
 
-            <Typography variant="h6" sx={{ mb: 3 }}>{selectedQuestions[currentIndex].question}</Typography>
-            <Grid container spacing={2}>
-              {scaleOptions.map(opt => (
-                <Grid item xs={12} sm={6} md={4} key={opt.value}>
-                  <Paper sx={{ p: 2, cursor: 'pointer', border: responses[selectedQuestions[currentIndex].id] === opt.value ? '2px solid #1976d2' : '1px solid #e0e0e0', bgcolor: responses[selectedQuestions[currentIndex].id] === opt.value ? '#f3f8ff' : 'white' }}
-                    onClick={() => answerCurrent(selectedQuestions[currentIndex].id, opt.value)}>
-                    <Typography variant="body1" sx={{ fontWeight: 600 }}>{opt.icon} {opt.value} - {opt.label.split('/')[0]}</Typography>
-                    <Typography variant="body2" color="text.secondary">{opt.label.split('/')[1]}</Typography>
-                  </Paper>
+            {activitySession?.engagementSummary && (
+              <Paper sx={{ p: 3, mb: 3, bgcolor: 'primary.light', color: 'primary.contrastText' }} elevation={0}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
+                  Live Activity Summary
+                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={4}>
+                    <Typography variant="body2">Avg Engagement</Typography>
+                    <Typography variant="h5">{activitySession.engagementSummary.averageEngagement.toFixed(1)}%</Typography>
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <Typography variant="body2">Attention</Typography>
+                    <Typography variant="h5">{activitySession.engagementSummary.averageAttention.toFixed(1)}%</Typography>
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <Typography variant="body2">Dominant Emotion</Typography>
+                    <Typography variant="h5" sx={{ textTransform: 'capitalize' }}>
+                      {activitySession.engagementSummary.dominantEmotion}
+                    </Typography>
+                  </Grid>
                 </Grid>
-              ))}
-            </Grid>
+                {activitySession.engagementSummary.insights.length > 0 && (
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="body2" sx={{ opacity: 0.85 }}>
+                      Recent feedback: {activitySession.engagementSummary.insights[0]}
+                    </Typography>
+                  </Box>
+                )}
+              </Paper>
+            )}
+
+            <Typography variant="h6" sx={{ mb: 3 }}>{selectedQuestions[currentIndex].question}</Typography>
+            {(() => {
+              const currentQuestion = selectedQuestions[currentIndex];
+              const options: ScaleOption[] = getScaleOptionsForCategory(currentQuestion.category);
+              return (
+                <Grid container spacing={2}>
+                  {options.map(opt => (
+                    <Grid item xs={12} sm={6} md={4} key={`${currentQuestion.id}-${opt.value}`}>
+                      <Paper
+                        sx={{
+                          p: 2,
+                          cursor: 'pointer',
+                          border: responses[currentQuestion.id] === opt.value ? '2px solid #1976d2' : '1px solid #e0e0e0',
+                          bgcolor: responses[currentQuestion.id] === opt.value ? '#f3f8ff' : 'white',
+                          height: '100%'
+                        }}
+                        onClick={() => answerCurrent(currentQuestion.id, opt.value)}
+                      >
+                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                          {opt.icon} {opt.label}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {opt.description}
+                        </Typography>
+                      </Paper>
+                    </Grid>
+                  ))}
+                </Grid>
+              );
+            })()}
           </Paper>
         </Fade>
       )}

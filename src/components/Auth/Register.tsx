@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import {
   Container,
   Paper,
@@ -203,7 +203,30 @@ const Register: React.FC = () => {
                   onChange={handleChange}
                 />
               }
-              label="I agree to the terms and conditions and privacy policy"
+              label={
+                <Typography variant="body2">
+                  I have read and agree to the{' '}
+                  <Box
+                    component={RouterLink}
+                    to="/terms"
+                    style={{ color: '#1976d2', textDecoration: 'underline' }}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Terms of Service
+                  </Box>{' '}
+                  and{' '}
+                  <Box
+                    component={RouterLink}
+                    to="/privacy"
+                    style={{ color: '#1976d2', textDecoration: 'underline' }}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Privacy Policy
+                  </Box>
+                </Typography>
+              }
               sx={{ mb: 2 }}
             />
             
@@ -225,11 +248,11 @@ const Register: React.FC = () => {
             </Button>
             
             <Box sx={{ textAlign: 'center' }}>
-              <Link to="/login" style={{ textDecoration: 'none' }}>
+              <RouterLink to="/login" style={{ textDecoration: 'none' }}>
                 <Typography variant="body1" color="primary" sx={{ fontWeight: 500 }}>
                   Already have an account? Sign in here
                 </Typography>
-              </Link>
+              </RouterLink>
             </Box>
           </Box>
         </Paper>

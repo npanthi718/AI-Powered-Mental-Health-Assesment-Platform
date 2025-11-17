@@ -23,6 +23,7 @@ import {
   MenuItem,
   LinearProgress,
   Alert,
+  Rating,
   List,
   ListItem,
   ListItemText,
@@ -35,6 +36,9 @@ import {
   DialogContent,
   DialogActions,
   Divider,
+  Slider,
+  Switch,
+  FormControlLabel
 } from '@mui/material';
 import {
   Dashboard,
@@ -74,7 +78,9 @@ import {
   Cell,
   Legend,
   AreaChart,
-  Area
+  Area,
+  LineChart as RechartsLineChart,
+  Line
 } from 'recharts';
 import { useAuth } from '../../contexts/AuthContext';
 import { useData } from '../../contexts/DataContext';
@@ -85,6 +91,7 @@ const AdminDashboard: React.FC = () => {
     assessments, 
     chatMessages, 
     systemMetrics, 
+    systemSettings,
     getAllUsers, 
     updateUserStatus, 
     deleteUser,
@@ -92,7 +99,13 @@ const AdminDashboard: React.FC = () => {
     getRealTimeActivity,
     getReviews,
     submitChatMessage,
-    updateSystemMetrics
+    markChatMessageHandled,
+    updateSystemMetrics,
+    updateReview,
+    deleteReview,
+    updateSystemSettings,
+    refreshData,
+    deleteAssessmentsByIds
   } = useData();
 
   const [selectedSection, setSelectedSection] = useState('overview');
@@ -105,6 +118,24 @@ const AdminDashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRisk, setFilterRisk] = useState('all');
   const [systemAlerts, setSystemAlerts] = useState<any[]>([]);
+  const [assessmentRiskFilter, setAssessmentRiskFilter] = useState<'all' | 'low' | 'moderate' | 'high'>('all');
+  const [assessmentRange, setAssessmentRange] = useState<'7' | '30' | '90' | 'all'>('30');
+  const [assessmentSearch, setAssessmentSearch] = useState('');
+  const [selectedAssessmentRecord, setSelectedAssessmentRecord] = useState<any | null>(null);
+  const [assessmentDialogOpen, setAssessmentDialogOpen] = useState(false);
+  const [reviewSearch, setReviewSearch] = useState('');
+  const [reviewFilter, setReviewFilter] = useState<'all' | 'featured' | 'flagged'>('all');
+  const [systemSettingsDraft, setSystemSettingsDraft] = useState(systemSettings);
+  const [liveActionsLog, setLiveActionsLog] = useState<string[]>([]);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [latencyTrend, setLatencyTrend] = useState(() => {
+    return Array.from({ length: 6 }).map((_, idx) => ({
+      label: new Date(Date.now() - (5 - idx) * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      latency: systemMetrics.responseTime,
+      uptime: systemMetrics.uptime
+    }));
+  });
 
   // Real-time updates every 3 seconds
   useEffect(() => {
@@ -155,6 +186,22 @@ const AdminDashboard: React.FC = () => {
     return () => clearInterval(interval);
   }, [assessments, chatMessages, updateSystemMetrics]);
 
+  useEffect(() => {
+    setSystemSettingsDraft(systemSettings);
+  }, [systemSettings]);
+
+  useEffect(() => {
+    setLatencyTrend(prev => {
+      const nextPoint = {
+        label: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        latency: systemMetrics.responseTime,
+        uptime: systemMetrics.uptime
+      };
+      const updated = [...prev, nextPoint];
+      return updated.slice(-8);
+    });
+  }, [systemMetrics.responseTime, systemMetrics.uptime]);
+
   const handleUserAction = (userId: string, action: string) => {
     switch (action) {
       case 'block':
@@ -197,8 +244,10 @@ const AdminDashboard: React.FC = () => {
         userId: selectedChat.userId,
         message: `Admin Response: ${replyMessage}`,
         anonymous: false,
-        response: 'admin'
+        response: 'admin',
+        sender: 'support'
       });
+      markChatMessageHandled(selectedChat.id, 'admin');
       setReplyMessage('');
       setChatDialogOpen(false);
       setNotifications(prev => [...prev, {
@@ -211,10 +260,92 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleAssessmentExport = () => {
+    if (filteredAssessments.length === 0) {
+      alert('No assessments to export for the current filters.');
+      return;
+    }
+    const header = 'User ID,Risk Level,Risk Score,Emotion,Timestamp\n';
+    const rows = filteredAssessments.map((assessment) => {
+      const emotion = assessment.emotionType || 'n/a';
+      return `${assessment.userId},${assessment.riskLevel},${(assessment.riskScore * 100).toFixed(1)}%,${emotion},${new Date(assessment.timestamp).toLocaleString()}`;
+    }).join('\n');
+    const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `assessment-report-${Date.now()}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const openAssessmentDetails = (assessment: any) => {
+    setSelectedAssessmentRecord(assessment);
+    setAssessmentDialogOpen(true);
+  };
+
+  const handleReviewToggleFeatured = (review: any) => {
+    updateReview(review.id, { featured: !review.featured });
+    setNotifications(prev => [...prev, {
+      id: Date.now(),
+      type: 'review-action',
+      message: `${review.userName} review ${review.featured ? 'removed from' : 'added to'} featured`,
+      timestamp: new Date().toISOString(),
+      severity: review.featured ? 'warning' : 'success'
+    }]);
+  };
+
+  const handleReviewDelete = (review: any) => {
+    deleteReview(review.id);
+    setNotifications(prev => [...prev, {
+      id: Date.now(),
+      type: 'review-action',
+      message: `Review from ${review.userName} deleted`,
+      timestamp: new Date().toISOString(),
+      severity: 'error'
+    }]);
+  };
+
+  const handleAssessmentDelete = () => {
+    if (!selectedAssessmentRecord?.id) return;
+    const safeId = typeof selectedAssessmentRecord.id === 'string' ? selectedAssessmentRecord.id : String(selectedAssessmentRecord.id);
+    deleteAssessmentsByIds([selectedAssessmentRecord.id]);
+    setAssessmentDialogOpen(false);
+    setNotifications(prev => [...prev, {
+      id: Date.now(),
+      type: 'assessment-action',
+      message: `Assessment ${safeId.slice(0, 8)} removed`,
+      timestamp: new Date().toISOString(),
+      severity: 'warning'
+    }]);
+  };
+
+  const saveSystemSettings = () => {
+    updateSystemSettings(systemSettingsDraft);
+    pushSystemNotification('System thresholds updated successfully', 'success');
+  };
+
+  const logLiveAction = (message: string) => {
+    setLiveActionsLog(prev => [message, ...prev].slice(0, 6));
+  };
+
+  const pushSystemNotification = (message: string, severity: 'success' | 'info' | 'warning' | 'error' = 'info') => {
+    setNotifications(prev => [
+      {
+        id: Date.now(),
+        type: 'system',
+        message,
+        timestamp: new Date().toISOString(),
+        severity
+      },
+      ...prev
+    ]);
+  };
+
   const analytics = getAnalytics();
   const users = getAllUsers();
   const activity = getRealTimeActivity();
-  const reviews = getReviews();
+  const allReviews = getReviews();
   const pendingChats = chatMessages.filter(m => !m.response);
 
   // Filter users based on search and risk level
@@ -263,6 +394,53 @@ const AdminDashboard: React.FC = () => {
     color: key === 'low' ? '#4caf50' : key === 'moderate' ? '#ff9800' : '#f44336'
   }));
 
+  const filteredAssessments = React.useMemo(() => {
+    return assessments
+      .filter((assessment) => {
+        const matchesRisk = assessmentRiskFilter === 'all' || assessment.riskLevel === assessmentRiskFilter;
+        const matchesSearch = !assessmentSearch.trim() || (assessment.userId?.toLowerCase().includes(assessmentSearch.toLowerCase()));
+        if (!matchesRisk || !matchesSearch) return false;
+        if (assessmentRange === 'all') return true;
+        const days = Number(assessmentRange);
+        if (Number.isNaN(days)) return true;
+        const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+        return new Date(assessment.timestamp).getTime() >= cutoff;
+      })
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }, [assessments, assessmentRiskFilter, assessmentRange, assessmentSearch]);
+
+  const assessmentSummary = React.useMemo(() => {
+    if (filteredAssessments.length === 0) {
+      return { averageScore: 0, highRiskShare: 0, moderateRiskShare: 0 };
+    }
+    const avgScore = filteredAssessments.reduce((sum, a) => sum + (1 - a.riskScore), 0) / filteredAssessments.length;
+    const highRiskCount = filteredAssessments.filter(a => a.riskLevel === 'high').length;
+    const moderateRiskCount = filteredAssessments.filter(a => a.riskLevel === 'moderate').length;
+    return {
+      averageScore: avgScore,
+      highRiskShare: (highRiskCount / filteredAssessments.length) * 100,
+      moderateRiskShare: (moderateRiskCount / filteredAssessments.length) * 100
+    };
+  }, [filteredAssessments]);
+
+  const filteredReviews = React.useMemo(() => {
+    return allReviews
+      .filter((review) => {
+        const matchesSearch = !reviewSearch.trim() ||
+          review.userName?.toLowerCase().includes(reviewSearch.toLowerCase()) ||
+          review.comment?.toLowerCase().includes(reviewSearch.toLowerCase());
+        if (!matchesSearch) return false;
+        if (reviewFilter === 'featured') {
+          return review.featured;
+        }
+        if (reviewFilter === 'flagged') {
+          return review.flagged;
+        }
+        return true;
+      })
+      .slice(0, 25);
+  }, [allReviews, reviewFilter, reviewSearch]);
+
   // Admin sidebar menu items
   const menuItems = [
     { id: 'overview', label: 'System Overview', icon: <Dashboard />, color: '#667eea' },
@@ -274,6 +452,50 @@ const AdminDashboard: React.FC = () => {
     { id: 'system', label: 'System Control', icon: <Settings />, color: '#667eea' },
     { id: 'monitoring', label: 'Live Monitoring', icon: <MonitorHeart />, color: '#f093fb' },
   ];
+
+  const getUserDisplayLabel = (userId: string | number) => {
+    const safeId = typeof userId === 'string' ? userId : String(userId);
+    const shortId = safeId.length > 10 ? `${safeId.slice(0, 10)}…` : safeId;
+    const userRecord = users.find(u => u.id === safeId);
+    if (userRecord && typeof userRecord.name === 'string' && userRecord.name.length > 0) {
+      return `${userRecord.name} (${shortId})`;
+    }
+    return safeId;
+  };
+
+  const formatActivityMessage = (item: any) => {
+    const label = getUserDisplayLabel(item.userId);
+    if (item.type === 'assessment') {
+      return `${label} completed mental health assessment`;
+    }
+    return `${label} sent support message`;
+  };
+
+  const combinedNotifications = [...systemAlerts, ...notifications].sort((a, b) =>
+    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  );
+
+  const handleUserExport = () => {
+    if (filteredUsers.length === 0) {
+      alert('No users to export for the current filters.');
+      return;
+    }
+    const header = 'Name,Email,Status,Assessments,Last Activity\n';
+    const rows = filteredUsers.map((user) => {
+      const safeName = typeof user.name === 'string' ? user.name : 'Unknown';
+      const safeEmail = typeof user.email === 'string' ? user.email : 'n/a';
+      const userAssessments = assessments.filter(a => a.userId === user.id);
+      const last = userAssessments[0]?.timestamp ? new Date(userAssessments[0].timestamp).toLocaleString() : 'Never';
+      return `"${safeName}","${safeEmail}",${user.status || 'active'},${userAssessments.length},${last}`;
+    }).join('\n');
+    const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `user-report-${Date.now()}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const renderSystemOverview = () => (
     <Box>
@@ -395,54 +617,82 @@ const AdminDashboard: React.FC = () => {
       </Grid>
 
       {/* Live Activity and System Health */}
-      <Grid container spacing={4}>
+      <Grid container spacing={{ xs: 2, sm: 3, md: 4 }}>
         <Grid item xs={12} md={8}>
-          <Card sx={{ boxShadow: 4, minHeight: 520 }}>
-            <CardContent sx={{ maxHeight: 700, overflow: 'auto' }}>
-              <Typography variant="h4" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 2, fontWeight: 700 }}>
+          <Card sx={{ 
+            boxShadow: 4, 
+            minHeight: { xs: 400, sm: 520 },
+            borderRadius: 3
+          }}>
+            <CardContent sx={{ maxHeight: { xs: 500, sm: 700 }, overflow: 'auto', p: { xs: 2, sm: 3 } }}>
+              <Typography variant="h4" gutterBottom sx={{ 
+                display: 'flex', 
+                flexWrap: 'wrap',
+                alignItems: 'center', 
+                gap: 2, 
+                fontWeight: 700,
+                fontSize: { xs: '1.25rem', sm: '1.5rem', md: '2rem' }
+              }}>
                 🔴 LIVE SYSTEM ACTIVITY
-                <Chip label="LIVE" color="error" size="medium" sx={{ animation: 'pulse 2s infinite', fontWeight: 700 }} />
+                <Chip 
+                  label="LIVE" 
+                  color="error" 
+                  size="small"
+                  sx={{ 
+                    animation: 'pulse 2s infinite', 
+                    fontWeight: 700,
+                    fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                  }} 
+                />
               </Typography>
               <Box sx={{ maxHeight: 500, overflow: 'auto' }}>
                 <List>
                   {activity.slice(0, 15).map((item, index) => {
-                    // Try to get user's full name from users list
-                    let userName = '';
-                    if (item.userId) {
-                      const userObj = users.find(u => u.id === item.userId);
-                      userName = userObj && typeof userObj.name === 'string' && userObj.name.length > 0 ? userObj.name : item.userId;
-                    }
-                    const messageText = item.type === 'assessment'
-                      ? `User ${userName} completed mental health assessment`
-                      : item.message;
                     return (
                       <ListItem key={index} sx={{ 
                         border: '2px solid #e0e0e0', 
                         mb: 2, 
                         borderRadius: 3,
                         bgcolor: item.riskLevel === 'high' ? '#ffebee' : 'white',
-                        boxShadow: 2
+                        boxShadow: 2,
+                        flexDirection: { xs: 'column', sm: 'row' },
+                        alignItems: { xs: 'flex-start', sm: 'center' },
+                        gap: { xs: 1, sm: 0 }
                       }}>
-                        <ListItemIcon>
+                        <ListItemIcon sx={{ minWidth: { xs: 'auto', sm: 56 } }}>
                           {item.type === 'assessment' ? 
-                            <Assessment color={item.riskLevel === 'high' ? 'error' : 'primary'} sx={{ fontSize: 30 }} /> :
-                            <Chat color="secondary" sx={{ fontSize: 30 }} />
+                            <Assessment color={item.riskLevel === 'high' ? 'error' : 'primary'} sx={{ fontSize: { xs: 24, sm: 30 } }} /> :
+                            <Chat color="secondary" sx={{ fontSize: { xs: 24, sm: 30 } }} />
                           }
                         </ListItemIcon>
                         <ListItemText
                           primary={
-                            <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                              {messageText}
+                            <Typography variant="h6" sx={{ 
+                              fontWeight: 600,
+                              fontSize: { xs: '0.875rem', sm: '1rem', md: '1.25rem' }
+                            }}>
+                              {item.message}
                             </Typography>
                           }
                           secondary={
-                            <Typography variant="body1" color="text.secondary">
+                            <Typography variant="body1" color="text.secondary" sx={{ 
+                              fontSize: { xs: '0.75rem', sm: '0.875rem' }
+                            }}>
                               {new Date(item.timestamp).toLocaleString()}
                             </Typography>
                           }
                         />
                         {item.riskLevel === 'high' && (
-                          <Chip label="🚨 HIGH RISK" color="error" size="large" sx={{ fontWeight: 700 }} />
+                          <Chip 
+                            label="🚨 HIGH RISK" 
+                            color="error" 
+                            size="small"
+                            sx={{ 
+                              fontWeight: 700,
+                              fontSize: { xs: '0.7rem', sm: '0.875rem' },
+                              mt: { xs: 1, sm: 0 }
+                            }} 
+                          />
                         )}
                       </ListItem>
                     );
@@ -454,9 +704,16 @@ const AdminDashboard: React.FC = () => {
         </Grid>
 
         <Grid item xs={12} md={4}>
-          <Card sx={{ boxShadow: 4, minHeight: 520 }}>
-            <CardContent sx={{ maxHeight: 700, overflow: 'auto' }}>
-              <Typography variant="h5" gutterBottom sx={{ fontWeight: 700 }}>
+          <Card sx={{ 
+            boxShadow: 4, 
+            minHeight: { xs: 400, sm: 520 },
+            borderRadius: 3
+          }}>
+            <CardContent sx={{ maxHeight: { xs: 500, sm: 700 }, overflow: 'auto', p: { xs: 2, sm: 3 } }}>
+              <Typography variant="h5" gutterBottom sx={{ 
+                fontWeight: 700,
+                fontSize: { xs: '1.125rem', sm: '1.25rem', md: '1.5rem' }
+              }}>
                 📊 Risk Distribution
               </Typography>
               <ResponsiveContainer width="100%" height={300}>
@@ -599,6 +856,7 @@ const AdminDashboard: React.FC = () => {
               startIcon={<Download />}
               size="large"
               sx={{ py: 2, fontSize: '1.1rem', fontWeight: 600 }}
+              onClick={handleUserExport}
             >
               Export User Data
             </Button>
@@ -610,6 +868,7 @@ const AdminDashboard: React.FC = () => {
               startIcon={<Refresh />}
               size="large"
               sx={{ py: 2 }}
+              onClick={() => refreshData()}
             >
               Refresh
             </Button>
@@ -932,12 +1191,622 @@ const AdminDashboard: React.FC = () => {
     </Box>
   );
 
+  const renderAssessmentReports = () => (
+    <Box>
+      <Typography variant="h3" gutterBottom sx={{ fontWeight: 800, mb: 4 }}>
+        📑 Assessment Intelligence Console
+      </Typography>
+
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid item xs={12} md={4}>
+          <Card sx={{ p: 3, boxShadow: 4 }}>
+            <Typography variant="body1" color="text.secondary">
+              Average Wellbeing Score
+            </Typography>
+            <Typography variant="h2" color="primary">
+              {(assessmentSummary.averageScore * 100).toFixed(1)}%
+            </Typography>
+            <LinearProgress
+              variant="determinate"
+              value={assessmentSummary.averageScore * 100}
+              sx={{ mt: 2, height: 10, borderRadius: 5 }}
+            />
+          </Card>
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Card sx={{ p: 3, boxShadow: 4 }}>
+            <Typography variant="body1" color="text.secondary">
+              High Risk Share
+            </Typography>
+            <Typography variant="h2" color="error">
+              {assessmentSummary.highRiskShare.toFixed(1)}%
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Requires immediate attention
+            </Typography>
+          </Card>
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Card sx={{ p: 3, boxShadow: 4 }}>
+            <Typography variant="body1" color="text.secondary">
+              Moderate Risk Share
+            </Typography>
+            <Typography variant="h2" color="warning.main">
+              {assessmentSummary.moderateRiskShare.toFixed(1)}%
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Monitor for early interventions
+            </Typography>
+          </Card>
+        </Grid>
+      </Grid>
+
+      <Paper sx={{ p: 4, mb: 4, boxShadow: 4 }}>
+        <Grid container spacing={2}>
+          <Grid item xs={12} md={4}>
+            <TextField
+              fullWidth
+              label="Search by User ID"
+              value={assessmentSearch}
+              onChange={(e) => setAssessmentSearch(e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <FormControl fullWidth>
+              <InputLabel>Risk Level</InputLabel>
+              <Select
+                value={assessmentRiskFilter}
+                label="Risk Level"
+                onChange={(e) => setAssessmentRiskFilter(e.target.value as 'all' | 'low' | 'moderate' | 'high')}
+              >
+                <MenuItem value="all">All Risk Levels</MenuItem>
+                <MenuItem value="low">Low</MenuItem>
+                <MenuItem value="moderate">Moderate</MenuItem>
+                <MenuItem value="high">High</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <FormControl fullWidth>
+              <InputLabel>Time Range</InputLabel>
+              <Select
+                value={assessmentRange}
+                label="Time Range"
+                onChange={(e) => setAssessmentRange(e.target.value as '7' | '30' | '90' | 'all')}
+              >
+                <MenuItem value="7">Last 7 days</MenuItem>
+                <MenuItem value="30">Last 30 days</MenuItem>
+                <MenuItem value="90">Last 90 days</MenuItem>
+                <MenuItem value="all">All assessments</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12} md={8}>
+            <Typography variant="body2" color="text.secondary">
+              Showing {filteredAssessments.length} assessments
+            </Typography>
+          </Grid>
+          <Grid item xs={12} md={4} sx={{ textAlign: { xs: 'left', md: 'right' } }}>
+            <Button
+              variant="contained"
+              startIcon={<Download />}
+              onClick={handleAssessmentExport}
+              sx={{ fontWeight: 600 }}
+            >
+              Export CSV
+            </Button>
+          </Grid>
+        </Grid>
+      </Paper>
+
+      <TableContainer component={Paper} sx={{ boxShadow: 4 }}>
+        <Table>
+          <TableHead>
+            <TableRow sx={{ bgcolor: '#1a1a1a' }}>
+              <TableCell sx={{ color: 'white' }}>User ID</TableCell>
+              <TableCell sx={{ color: 'white' }}>Risk Level</TableCell>
+              <TableCell sx={{ color: 'white' }}>Risk Score</TableCell>
+              <TableCell sx={{ color: 'white' }}>Emotion</TableCell>
+              <TableCell sx={{ color: 'white' }}>Timestamp</TableCell>
+              <TableCell sx={{ color: 'white' }}>Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {filteredAssessments.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={6}>
+                  <Typography textAlign="center" color="text.secondary" sx={{ py: 4 }}>
+                    No assessments match the selected filters.
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            )}
+            {filteredAssessments.map((assessment) => (
+              <TableRow key={assessment.id}>
+                <TableCell>{getUserDisplayLabel(assessment.userId)}</TableCell>
+                <TableCell>
+                  <Chip
+                    label={assessment.riskLevel.toUpperCase()}
+                    color={
+                      assessment.riskLevel === 'low'
+                        ? 'success'
+                        : assessment.riskLevel === 'moderate'
+                        ? 'warning'
+                        : 'error'
+                    }
+                  />
+                </TableCell>
+                <TableCell>{(assessment.riskScore * 100).toFixed(1)}%</TableCell>
+                <TableCell sx={{ textTransform: 'capitalize' }}>
+                  {assessment.emotionType || 'neutral'}
+                </TableCell>
+                <TableCell>{new Date(assessment.timestamp).toLocaleString()}</TableCell>
+                <TableCell>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => openAssessmentDetails(assessment)}
+                  >
+                    View
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Box>
+  );
+
+  const renderReviewManagement = () => {
+    const averageRating = allReviews.length
+      ? allReviews.reduce((sum, review) => sum + (review.rating || 0), 0) / allReviews.length
+      : 0;
+    const featuredCount = allReviews.filter(review => review.featured).length;
+    const flaggedCount = allReviews.filter(review => review.flagged).length;
+
+    return (
+      <Box>
+        <Typography variant="h3" gutterBottom sx={{ fontWeight: 800, mb: 4 }}>
+          ⭐ Review Management & Community Trust
+        </Typography>
+
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          <Grid item xs={12} md={4}>
+            <Card sx={{ p: 3, boxShadow: 4 }}>
+              <Typography variant="body1" color="text.secondary">
+                Average Rating
+              </Typography>
+              <Typography variant="h2" color="primary">
+                {averageRating.toFixed(1)} / 5
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {allReviews.length} total reviews
+              </Typography>
+            </Card>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <Card sx={{ p: 3, boxShadow: 4 }}>
+              <Typography variant="body1" color="text.secondary">
+                Featured Reviews
+              </Typography>
+              <Typography variant="h2" color="success.main">
+                {featuredCount}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Highlighted on the user dashboard
+              </Typography>
+            </Card>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <Card sx={{ p: 3, boxShadow: 4 }}>
+              <Typography variant="body1" color="text.secondary">
+                Flagged Reviews
+              </Typography>
+              <Typography variant="h2" color="warning.main">
+                {flaggedCount}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Pending moderation
+              </Typography>
+            </Card>
+          </Grid>
+        </Grid>
+
+        <Paper sx={{ p: 4, mb: 4, boxShadow: 4 }}>
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Search reviews"
+                value={reviewSearch}
+                onChange={(e) => setReviewSearch(e.target.value)}
+                placeholder="Search by author or keywords"
+              />
+            </Grid>
+            <Grid item xs={12} md={3}>
+              <FormControl fullWidth>
+                <InputLabel>Filter</InputLabel>
+                <Select
+                  value={reviewFilter}
+                  label="Filter"
+                  onChange={(e) => setReviewFilter(e.target.value as 'all' | 'featured' | 'flagged')}
+                >
+                  <MenuItem value="all">All reviews</MenuItem>
+                  <MenuItem value="featured">Featured only</MenuItem>
+                  <MenuItem value="flagged">Flagged for action</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
+        </Paper>
+
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={8}>
+            <List sx={{ boxShadow: 4, bgcolor: 'background.paper', borderRadius: 2 }}>
+              {filteredReviews.length === 0 && (
+                <Box sx={{ py: 6, textAlign: 'center', color: 'text.secondary' }}>
+                  <Typography>No reviews found for the current filters.</Typography>
+                </Box>
+              )}
+              {filteredReviews.map((review) => (
+                <React.Fragment key={review.id}>
+                  <ListItem alignItems="flex-start" sx={{ px: 3, py: 2 }}>
+                    <ListItemText
+                      primary={
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <Box>
+                            <Typography variant="h6">{review.userName}</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {review.userRole} • {new Date(review.timestamp).toLocaleDateString()}
+                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+                              <Rating size="small" value={review.rating} readOnly />
+                              {review.category && (
+                                <Chip label={review.category} size="small" sx={{ textTransform: 'capitalize' }} />
+                              )}
+                              {review.featured && (
+                                <Chip label="Featured" size="small" color="success" variant="outlined" />
+                              )}
+                              {review.flagged && (
+                                <Chip label="Flagged" size="small" color="warning" variant="outlined" />
+                              )}
+                            </Box>
+                          </Box>
+                          <Box sx={{ display: 'flex', gap: 1 }}>
+                            <Button
+                              variant={review.featured ? 'outlined' : 'contained'}
+                              size="small"
+                              onClick={() => handleReviewToggleFeatured(review)}
+                            >
+                              {review.featured ? 'Unfeature' : 'Feature'}
+                            </Button>
+                            <Button
+                              variant="text"
+                              color="error"
+                              size="small"
+                              onClick={() => handleReviewDelete(review)}
+                            >
+                              Delete
+                            </Button>
+                          </Box>
+                        </Box>
+                      }
+                      secondary={
+                        <Typography variant="body2" color="text.primary" sx={{ mt: 1 }}>
+                          "{review.comment}"
+                        </Typography>
+                      }
+                    />
+                  </ListItem>
+                  <Divider component="li" />
+                </React.Fragment>
+              ))}
+            </List>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <Card sx={{ p: 3, boxShadow: 4 }}>
+              <Typography variant="h6" gutterBottom>
+                Moderation Notes
+              </Typography>
+              <List dense>
+                <ListItem>
+                  <ListItemText primary="Feature high quality, detailed reviews to build trust." />
+                </ListItem>
+                <ListItem>
+                  <ListItemText primary="Flag reviews that disclose sensitive personal information." />
+                </ListItem>
+                <ListItem>
+                  <ListItemText primary="Reply to critical reviews within 24h to show responsiveness." />
+                </ListItem>
+              </List>
+            </Card>
+          </Grid>
+        </Grid>
+      </Box>
+    );
+  };
+
+  const renderSystemControl = () => (
+    <Box>
+      <Typography variant="h3" gutterBottom sx={{ fontWeight: 800, mb: 4 }}>
+        🛠️ System Control & Automation
+      </Typography>
+
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={8}>
+          <Card sx={{ p: 4, boxShadow: 4 }}>
+            <Typography variant="h5" gutterBottom>
+              Threshold Configuration
+            </Typography>
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="body2" color="text.secondary">
+                Accuracy Threshold ({(systemSettingsDraft.accuracyThreshold * 100).toFixed(0)}%)
+              </Typography>
+              <Slider
+                min={0.6}
+                max={0.99}
+                step={0.01}
+                value={systemSettingsDraft.accuracyThreshold}
+                onChange={(_, value) =>
+                  setSystemSettingsDraft(prev => ({ ...prev, accuracyThreshold: value as number }))
+                }
+              />
+            </Box>
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="body2" color="text.secondary">
+                Risk Sensitivity ({(systemSettingsDraft.riskSensitivity * 100).toFixed(0)}%)
+              </Typography>
+              <Slider
+                min={0.5}
+                max={0.95}
+                step={0.01}
+                value={systemSettingsDraft.riskSensitivity}
+                onChange={(_, value) =>
+                  setSystemSettingsDraft(prev => ({ ...prev, riskSensitivity: value as number }))
+                }
+                color="warning"
+              />
+            </Box>
+            <FormControlLabel
+              sx={{ mt: 2 }}
+              control={
+                <Switch
+                  checked={systemSettingsDraft.autoAlerts}
+                  onChange={(e) =>
+                    setSystemSettingsDraft(prev => ({ ...prev, autoAlerts: e.target.checked }))
+                  }
+                />
+              }
+              label="Enable automated high-risk alerts"
+            />
+            <TextField
+              sx={{ mt: 3 }}
+              label="Data Retention (days)"
+              type="number"
+              value={systemSettingsDraft.dataRetention}
+              onChange={(e) =>
+                setSystemSettingsDraft(prev => ({ ...prev, dataRetention: Number(e.target.value) }))
+              }
+            />
+            <Box sx={{ display: 'flex', gap: 2, mt: 4 }}>
+              <Button variant="contained" onClick={saveSystemSettings} sx={{ fontWeight: 700 }}>
+                Save Settings
+              </Button>
+              <Button variant="outlined" onClick={() => setSystemSettingsDraft(systemSettings)}>
+                Reset
+              </Button>
+            </Box>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} md={4}>
+          <Card sx={{ p: 4, boxShadow: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              Automation Shortcuts
+            </Typography>
+            <Button
+              variant="contained"
+              startIcon={<Refresh />}
+              onClick={() => {
+                updateSystemMetrics();
+                logLiveAction('Manual metrics refresh executed');
+                pushSystemNotification('System metrics refreshed successfully', 'success');
+              }}
+            >
+              Refresh Metrics
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<Download />}
+              onClick={() => {
+                refreshData();
+                logLiveAction('Synced data from local storage');
+                pushSystemNotification('Local data reloaded', 'info');
+              }}
+            >
+              Sync Local Storage
+            </Button>
+            <Button
+              variant="outlined"
+              color="warning"
+              onClick={() => {
+                const demoIds = assessments
+                  .filter(a => typeof a.id === 'string' && a.id.startsWith('demo-'))
+                  .map(a => a.id as string);
+                if (demoIds.length === 0) {
+                  alert('No demo assessments detected.');
+                  return;
+                }
+                deleteAssessmentsByIds(demoIds);
+                logLiveAction(`Purged ${demoIds.length} demo assessments`);
+                pushSystemNotification(`Removed ${demoIds.length} demo assessments`, 'warning');
+              }}
+            >
+              Clean Demo Data
+            </Button>
+          </Card>
+        </Grid>
+      </Grid>
+    </Box>
+  );
+
+  const renderLiveMonitoring = () => {
+    const liveFeed = activity.slice(0, 10);
+    const highRiskQueue = assessments
+      .filter(a => a.riskLevel === 'high')
+      .slice(-5)
+      .reverse();
+
+    return (
+      <Box>
+        <Typography variant="h3" gutterBottom sx={{ fontWeight: 800, mb: 4 }}>
+          📡 Live Monitoring & Escalation
+        </Typography>
+
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={8}>
+            <Card sx={{ p: 3, boxShadow: 4 }}>
+              <Typography variant="h5" gutterBottom>
+                Real-time Activity Feed
+              </Typography>
+              <List sx={{ maxHeight: 420, overflow: 'auto' }}>
+                {liveFeed.map((item, index) => (
+                  <ListItem key={`${item.timestamp}-${index}`} sx={{ borderBottom: '1px solid #eee' }}>
+                    <ListItemIcon>
+                      {item.type === 'assessment' ? <Assessment color="primary" /> : <Chat color="secondary" />}
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={
+                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                          {formatActivityMessage(item)}
+                        </Typography>
+                      }
+                      secondary={new Date(item.timestamp).toLocaleString()}
+                    />
+                    {item.riskLevel === 'high' && (
+                      <Chip label="High" color="error" size="small" sx={{ fontWeight: 700 }} />
+                    )}
+                  </ListItem>
+                ))}
+              </List>
+            </Card>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <Card sx={{ p: 3, boxShadow: 4 }}>
+              <Typography variant="h6" gutterBottom>
+                Response Time Trend
+              </Typography>
+              <ResponsiveContainer width="100%" height={250}>
+                <RechartsLineChart data={latencyTrend}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="label" />
+                  <YAxis />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="latency" stroke="#1976d2" strokeWidth={2} name="Latency (ms)" />
+                </RechartsLineChart>
+              </ResponsiveContainer>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                Uptime: {systemMetrics.uptime.toFixed(2)}%
+              </Typography>
+            </Card>
+          </Grid>
+        </Grid>
+
+        <Grid container spacing={3} sx={{ mt: 2 }}>
+          <Grid item xs={12} md={4}>
+            <Card sx={{ p: 3, boxShadow: 4 }}>
+              <Typography variant="h6" gutterBottom>
+                High-Risk Queue
+              </Typography>
+              <List dense>
+                {highRiskQueue.length === 0 && (
+                  <ListItem>
+                    <ListItemText primary="No high-risk assessments pending." />
+                  </ListItem>
+                )}
+                {highRiskQueue.map((assessment) => (
+                  <ListItem key={assessment.id}>
+                    <ListItemText
+                      primary={getUserDisplayLabel(assessment.userId)}
+                      secondary={new Date(assessment.timestamp).toLocaleString()}
+                    />
+                    <Button size="small" onClick={() => openAssessmentDetails(assessment)}>
+                      View
+                    </Button>
+                  </ListItem>
+                ))}
+              </List>
+            </Card>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <Card sx={{ p: 3, boxShadow: 4 }}>
+              <Typography variant="h6" gutterBottom>
+                Action Log
+              </Typography>
+              <List dense>
+                {liveActionsLog.length === 0 && (
+                  <ListItem>
+                    <ListItemText primary="No manual actions recorded yet." />
+                  </ListItem>
+                )}
+                {liveActionsLog.map((entry, index) => (
+                  <ListItem key={`${entry}-${index}`}>
+                    <ListItemText primary={entry} />
+                  </ListItem>
+                ))}
+              </List>
+            </Card>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <Card sx={{ p: 3, boxShadow: 4 }}>
+              <Typography variant="h6" gutterBottom>
+                Escalation Controls
+              </Typography>
+              <Button
+                fullWidth
+                variant="contained"
+                color="error"
+                sx={{ mb: 2 }}
+                onClick={() => logLiveAction('Crisis escalation protocol triggered')}
+              >
+                Trigger Crisis Escalation
+              </Button>
+              <Button
+                fullWidth
+                variant="outlined"
+                sx={{ mb: 2 }}
+                onClick={() => logLiveAction('Broadcasted reassurance message to users')}
+              >
+                Broadcast Update
+              </Button>
+              <Button
+                fullWidth
+                variant="outlined"
+                onClick={() => {
+                  updateSystemMetrics();
+                  logLiveAction('Live monitoring refreshed manually');
+                }}
+              >
+                Refresh Live Feed
+              </Button>
+            </Card>
+          </Grid>
+        </Grid>
+      </Box>
+    );
+  };
+
   const renderContent = () => {
     switch (selectedSection) {
       case 'overview': return renderSystemOverview();
       case 'users': return renderUserManagement();
       case 'chats': return renderChatManagement();
       case 'analytics': return renderAnalytics();
+      case 'assessments': return renderAssessmentReports();
+      case 'reviews': return renderReviewManagement();
+      case 'system': return renderSystemControl();
+      case 'monitoring': return renderLiveMonitoring();
       default: return renderSystemOverview();
     }
   };
@@ -1018,29 +1887,57 @@ const AdminDashboard: React.FC = () => {
       </Drawer>
 
       {/* Main Content */}
-      <Box component="main" sx={{ flexGrow: 1, p: 4 }}>
+      <Box component="main" sx={{ flexGrow: 1, p: { xs: 1, sm: 2, md: 4 } }}>
         {/* Top Bar */}
-        <Paper sx={{ p: 3, mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: 4 }}>
+        <Paper sx={{ 
+          p: { xs: 2, sm: 3 }, 
+          mb: { xs: 2, sm: 3, md: 4 }, 
+          display: 'flex', 
+          flexDirection: { xs: 'column', sm: 'row' },
+          justifyContent: 'space-between', 
+          alignItems: { xs: 'flex-start', sm: 'center' },
+          gap: { xs: 2, sm: 0 },
+          boxShadow: 4,
+          borderRadius: 3
+        }}>
           <Box>
-            <Typography variant="h3" sx={{ fontWeight: 800, color: '#1a1a1a' }}>
+            <Typography variant="h3" sx={{ 
+              fontWeight: 800, 
+              color: '#1a1a1a',
+              fontSize: { xs: '1.5rem', sm: '2rem', md: '2.5rem' }
+            }}>
               AI Healthcare Admin Dashboard
             </Typography>
-            <Typography variant="h6" color="text.secondary">
+            <Typography variant="h6" color="text.secondary" sx={{ 
+              fontSize: { xs: '0.875rem', sm: '1rem' },
+              mt: { xs: 0.5, sm: 0 }
+            }}>
               Complete system control and monitoring
             </Typography>
           </Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1.5, sm: 3 } }}>
             <Badge badgeContent={systemAlerts.length} color="error">
               <IconButton 
                 color="inherit"
-                sx={{ bgcolor: 'primary.light', width: 60, height: 60 }}
+                sx={{ 
+                  bgcolor: 'primary.light', 
+                  width: { xs: 48, sm: 60 }, 
+                  height: { xs: 48, sm: 60 }
+                }}
+                onClick={() => setNotificationsOpen(true)}
               >
-                <NotificationsActive sx={{ fontSize: 30 }} />
+                <NotificationsActive sx={{ fontSize: { xs: 24, sm: 30 } }} />
               </IconButton>
             </Badge>
-            <Avatar sx={{ bgcolor: 'error.main', width: 60, height: 60 }}>
-              <SupervisorAccount sx={{ fontSize: 30 }} />
-            </Avatar>
+            <IconButton onClick={() => setProfileOpen(true)} sx={{ p: 0 }}>
+              <Avatar sx={{ 
+                bgcolor: 'error.main', 
+                width: { xs: 48, sm: 60 }, 
+                height: { xs: 48, sm: 60 }
+              }}>
+                <SupervisorAccount sx={{ fontSize: { xs: 24, sm: 30 } }} />
+              </Avatar>
+            </IconButton>
           </Box>
         </Paper>
 
@@ -1190,6 +2087,139 @@ const AdminDashboard: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Assessment Detail Dialog */}
+      <Dialog
+        open={assessmentDialogOpen}
+        onClose={() => setAssessmentDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Typography variant="h4" sx={{ fontWeight: 700 }}>
+            Assessment Detail
+          </Typography>
+        </DialogTitle>
+        <DialogContent dividers>
+          {selectedAssessmentRecord && (
+            <Box>
+              <Typography variant="h6" gutterBottom>
+                User: {getUserDisplayLabel(selectedAssessmentRecord.userId)}
+              </Typography>
+              <Typography variant="body1" gutterBottom>
+                Risk Level:{' '}
+                <Chip
+                  label={selectedAssessmentRecord.riskLevel}
+                  color={
+                    selectedAssessmentRecord.riskLevel === 'low'
+                      ? 'success'
+                      : selectedAssessmentRecord.riskLevel === 'moderate'
+                      ? 'warning'
+                      : 'error'
+                  }
+                  size="small"
+                  sx={{ ml: 1 }}
+                />
+              </Typography>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Recorded on {new Date(selectedAssessmentRecord.timestamp).toLocaleString()}
+              </Typography>
+
+              <List>
+                {Array.isArray(selectedAssessmentRecord.metrics) && selectedAssessmentRecord.metrics.length > 0 ? (
+                  selectedAssessmentRecord.metrics.map((metric: any) => (
+                    <ListItem key={metric.category}>
+                      <ListItemText
+                        primary={`${metric.category} • ${(metric.score * 100).toFixed(0)}%`}
+                        secondary={metric.interpretation}
+                      />
+                    </ListItem>
+                  ))
+                ) : (
+                  <ListItem>
+                    <ListItemText primary="No metric breakdown available." />
+                  </ListItem>
+                )}
+              </List>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button color="error" onClick={handleAssessmentDelete}>
+            Delete Record
+          </Button>
+          <Button onClick={() => setAssessmentDialogOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={notificationsOpen}
+        onClose={() => setNotificationsOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>
+            🔔 System Notifications
+          </Typography>
+        </DialogTitle>
+        <DialogContent dividers>
+          {combinedNotifications.length === 0 ? (
+            <Typography color="text.secondary">No notifications yet.</Typography>
+          ) : (
+            <List>
+              {combinedNotifications.map(note => (
+                <ListItem key={note.id} sx={{ borderBottom: '1px solid #eee' }}>
+                  <ListItemText
+                    primary={note.message}
+                    secondary={new Date(note.timestamp).toLocaleString()}
+                  />
+                  <Chip label={note.severity || 'info'} size="small" color={note.severity || 'info'} />
+                </ListItem>
+              ))}
+            </List>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setNotificationsOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>
+            👩‍💼 Admin Overview
+          </Typography>
+        </DialogTitle>
+        <DialogContent dividers>
+          <List>
+            <ListItem>
+              <ListItemText primary="Total Users" secondary={analytics.totalUsers} />
+            </ListItem>
+            <ListItem>
+              <ListItemText primary="Assessments Logged" secondary={analytics.totalAssessments} />
+            </ListItem>
+            <ListItem>
+              <ListItemText primary="Pending Chat Requests" secondary={pendingChats.length} />
+            </ListItem>
+            <ListItem>
+              <ListItemText primary="High-Risk Users" secondary={analytics.highRiskUsers} />
+            </ListItem>
+          </List>
+          <Typography variant="body2" color="text.secondary">
+            Stay vigilant—review live monitoring and respond to escalations promptly.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setProfileOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
     </Box>
   );
 };

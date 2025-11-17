@@ -219,6 +219,91 @@ export const wellnessActivities = [
   }
 ];
 
+export type ScaleOption = {
+  value: number;
+  label: string;
+  description: string;
+  icon: string;
+};
+
+const frequencyScale: ScaleOption[] = [
+  { value: 1, label: 'Almost Never', description: 'Rare or no occurrence', icon: '🌑' },
+  { value: 2, label: 'Occasionally', description: 'Happens a few times a month', icon: '🌘' },
+  { value: 3, label: 'Sometimes', description: 'Weekly or when triggered', icon: '🌓' },
+  { value: 4, label: 'Often', description: 'Several times each week', icon: '🌔' },
+  { value: 5, label: 'Nearly Always', description: 'Daily or constant experience', icon: '🌕' }
+];
+
+const qualityScale: ScaleOption[] = [
+  { value: 1, label: 'Very Poor', description: 'Restless, unrefreshing', icon: '😴' },
+  { value: 2, label: 'Poor', description: 'Inconsistent or fragmented', icon: '😪' },
+  { value: 3, label: 'Fair', description: 'Adequate but uneven', icon: '😐' },
+  { value: 4, label: 'Good', description: 'Mostly restorative', icon: '🙂' },
+  { value: 5, label: 'Excellent', description: 'Consistently restorative', icon: '😌' }
+];
+
+const confidenceScale: ScaleOption[] = [
+  { value: 1, label: 'Not At All', description: 'No confidence or clarity', icon: '⚫' },
+  { value: 2, label: 'Slightly', description: 'Limited or uncertain', icon: '🟠' },
+  { value: 3, label: 'Somewhat', description: 'Growing confidence', icon: '🟡' },
+  { value: 4, label: 'Mostly', description: 'Generally confident', icon: '🟢' },
+  { value: 5, label: 'Fully', description: 'Strong confidence', icon: '🔵' }
+];
+
+const wellbeingScale: ScaleOption[] = [
+  { value: 1, label: 'Very Low', description: 'Feeling drained or negative', icon: '📉' },
+  { value: 2, label: 'Low', description: 'Struggling frequently', icon: '⬇️' },
+  { value: 3, label: 'Balanced', description: 'Mixed experiences', icon: '⚖️' },
+  { value: 4, label: 'Positive', description: 'Generally steady', icon: '📈' },
+  { value: 5, label: 'Thriving', description: 'Consistently positive', icon: '🚀' }
+];
+
+const connectionScale: ScaleOption[] = [
+  { value: 1, label: 'Very Isolated', description: 'Rarely connected', icon: '🚫' },
+  { value: 2, label: 'Limited', description: 'Small support moments', icon: '🌱' },
+  { value: 3, label: 'Moderate', description: 'Some steady support', icon: '🌿' },
+  { value: 4, label: 'Strong', description: 'Reliable relationships', icon: '🌳' },
+  { value: 5, label: 'Very Strong', description: 'Deeply supported', icon: '🌲' }
+];
+
+const growthScale: ScaleOption[] = [
+  { value: 1, label: 'Stalled', description: 'Avoids change', icon: '🧊' },
+  { value: 2, label: 'Limited', description: 'Rarely tries new things', icon: '🌧️' },
+  { value: 3, label: 'Developing', description: 'Experimenting slowly', icon: '⛅' },
+  { value: 4, label: 'Engaged', description: 'Regular growth focus', icon: '🌤️' },
+  { value: 5, label: 'Expansive', description: 'Actively evolving', icon: '☀️' }
+];
+
+export const categoryScaleOptions: Record<string, ScaleOption[]> = {
+  stress: frequencyScale,
+  mood: wellbeingScale,
+  emotional: wellbeingScale,
+  sleep: qualityScale,
+  anxiety: frequencyScale,
+  social: connectionScale,
+  relationships: connectionScale,
+  satisfaction: confidenceScale,
+  fulfillment: confidenceScale,
+  purpose: confidenceScale,
+  hope: confidenceScale,
+  outlook: confidenceScale,
+  physical: wellbeingScale,
+  health: wellbeingScale,
+  self: confidenceScale,
+  coping: frequencyScale,
+  balance: frequencyScale,
+  focus: confidenceScale,
+  growth: growthScale,
+  anger: frequencyScale,
+  stress_management: frequencyScale
+};
+
+export const defaultScaleOptions = frequencyScale;
+
+export const getScaleOptionsForCategory = (category: string): ScaleOption[] => {
+  return categoryScaleOptions[category] || defaultScaleOptions;
+};
+
 export type AssessmentMetric = {
   category: string;
   score: number;
@@ -241,5 +326,11 @@ export type AssessmentResult = {
     currentScore: number;
     changePercent: number;
     activities: string[];
+  };
+  activityMonitoring?: {
+    averageEngagement: number;
+    averageAttention: number;
+    dominantEmotion: string;
+    insights: string[];
   };
 };

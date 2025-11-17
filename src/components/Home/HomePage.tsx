@@ -40,7 +40,7 @@ import {
   Insights,
   DataUsage
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useData } from '../../contexts/DataContext';
 
 const HomePage: React.FC = () => {
@@ -133,7 +133,7 @@ const HomePage: React.FC = () => {
           <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1 }}>
             <Psychology sx={{ fontSize: 32, mr: 2, color: 'primary.main' }} />
             <Typography variant="h6" component="div" sx={{ fontWeight: 700, color: 'primary.main' }}>
-              AI HealthCare Bolt
+              AI-Powered Mental Health HealthCare Platform
             </Typography>
           </Box>
           
@@ -170,7 +170,7 @@ const HomePage: React.FC = () => {
           <Grid container spacing={6} alignItems="center">
             <Grid item xs={12} md={6}>
               <Typography variant="h1" gutterBottom sx={{ fontWeight: 800 }}>
-                AI-Powered Mental Health
+                AI-Powered Mental HealthCare Platform
                 <Box component="span" sx={{ color: '#4fc3f7', display: 'block' }}>
                   Risk Assessment
                 </Box>
@@ -349,7 +349,7 @@ const HomePage: React.FC = () => {
                   Complete Assessment
                 </Typography>
                 <Typography color="text.secondary">
-                  Answer 15 standardized mental health questions with optional webcam emotion detection
+                  Answer 10 standardized mental health questions with optional webcam emotion detection
                 </Typography>
               </Card>
             </Grid>
@@ -498,7 +498,7 @@ const HomePage: React.FC = () => {
             Ready to Get Started?
           </Typography>
           <Typography variant="h5" sx={{ mb: 4, opacity: 0.9 }}>
-            Join thousands of users who trust AI HealthCare Bolt for their mental health assessment needs
+            Join thousands of users who trust AI-Powered Mental HealthCare Platform for their mental health assessment needs
           </Typography>
           <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', flexWrap: 'wrap' }}>
             <Button
@@ -539,11 +539,11 @@ const HomePage: React.FC = () => {
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <Psychology sx={{ fontSize: 32, mr: 2 }} />
                 <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                  AI HealthCare Bolt
+                  AI-Powered Mental HealthCare Platform
                 </Typography>
               </Box>
               <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                Revolutionary AI-powered mental health assessment system trusted by healthcare professionals worldwide.
+                Revolutionary AI-Powered Mental HealthCare Platform trusted by healthcare professionals worldwide.
               </Typography>
             </Grid>
             <Grid item xs={12} md={4}>
@@ -573,7 +573,23 @@ const HomePage: React.FC = () => {
           <Divider sx={{ my: 4, bgcolor: 'rgba(255,255,255,0.1)' }} />
           <Box sx={{ textAlign: 'center' }}>
             <Typography variant="body2" sx={{ opacity: 0.6 }}>
-              © 2024 AI HealthCare Bolt. All rights reserved. | Privacy Policy | Terms of Service
+              © 2025 AI-Powered Mental HealthCare Platform. All rights reserved. |
+              {' '}
+              <Box
+                component={RouterLink}
+                to="/privacy"
+                sx={{ color: '#90caf9', textDecoration: 'underline', mx: 0.5, fontWeight: 600 }}
+              >
+                Privacy Policy
+              </Box>
+              |
+              <Box
+                component={RouterLink}
+                to="/terms"
+                sx={{ color: '#90caf9', textDecoration: 'underline', ml: 0.5, fontWeight: 600 }}
+              >
+                Terms of Service
+              </Box>
             </Typography>
           </Box>
         </Container>

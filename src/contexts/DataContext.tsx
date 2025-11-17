@@ -20,6 +20,7 @@ interface ChatMessage {
   timestamp: string;
   anonymous: boolean;
   response?: string;
+  sender?: 'user' | 'support';
 }
 
 interface SystemMetrics {
@@ -54,6 +55,8 @@ interface DataContextType {
   systemMetrics: SystemMetrics;
   submitAssessment: (assessment: Omit<Assessment, 'id' | 'timestamp'>) => void;
   submitChatMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => void;
+  markChatMessageHandled: (messageId: string, responder: string) => void;
+  clearChatMessagesForUser: (userId: string) => void;
   getUserAssessments: (userId: string) => Assessment[];
   getAllUsers: () => User[];
   updateUserStatus: (userId: string, status: string) => void;
@@ -197,7 +200,21 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     }
     
     if (storedMessages) {
-      setChatMessages(JSON.parse(storedMessages));
+      try {
+        const parsed = JSON.parse(storedMessages);
+        if (Array.isArray(parsed)) {
+          const normalized = parsed.map((msg: ChatMessage) => ({
+            ...msg,
+            sender: msg.sender || (msg.response ? 'support' : 'user')
+          }));
+          setChatMessages(normalized);
+        } else {
+          setChatMessages([]);
+        }
+      } catch (e) {
+        console.warn('Failed to parse stored messages during init:', e);
+        setChatMessages([]);
+      }
     }
 
     if (storedMetrics) {
@@ -389,16 +406,38 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     }));
   };
 
-  const submitChatMessage = (message: Omit<ChatMessage, 'id' | 'timestamp'>) => {
+  const submitChatMessage = (message: Omit<ChatMessage, 'id' | 'timestamp'>): ChatMessage => {
     const newMessage: ChatMessage = {
       ...message,
+      sender: message.sender || 'user',
       id: `message-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       timestamp: new Date().toISOString()
     };
     
-    const updatedMessages = [newMessage, ...chatMessages];
-    setChatMessages(updatedMessages);
-    localStorage.setItem('ai_healthcare_messages', JSON.stringify(updatedMessages));
+    setChatMessages(prev => {
+      const updatedMessages = [newMessage, ...prev];
+      localStorage.setItem('ai_healthcare_messages', JSON.stringify(updatedMessages));
+      return updatedMessages;
+    });
+    return newMessage;
+  };
+
+  const markChatMessageHandled = (messageId: string, responder: string) => {
+    setChatMessages(prev => {
+      const updatedMessages = prev.map(message =>
+        message.id === messageId ? { ...message, response: responder } : message
+      );
+      localStorage.setItem('ai_healthcare_messages', JSON.stringify(updatedMessages));
+      return updatedMessages;
+    });
+  };
+
+  const clearChatMessagesForUser = (userId: string) => {
+    setChatMessages(prev => {
+      const updatedMessages = prev.filter(message => message.userId !== userId);
+      localStorage.setItem('ai_healthcare_messages', JSON.stringify(updatedMessages));
+      return updatedMessages;
+    });
   };
 
   const submitReview = (review: any) => {
@@ -418,6 +457,12 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     const updatedReviews = reviews.map(review => 
       review.id === reviewId ? { ...review, ...updates } : review
     );
+    setReviews(updatedReviews);
+    localStorage.setItem('ai_healthcare_reviews', JSON.stringify(updatedReviews));
+  };
+
+  const deleteReview = (reviewId: string) => {
+    const updatedReviews = reviews.filter(review => review.id !== reviewId);
     setReviews(updatedReviews);
     localStorage.setItem('ai_healthcare_reviews', JSON.stringify(updatedReviews));
   };
@@ -476,13 +521,24 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
   const getRealTimeActivity = () => {
     const activities: Activity[] = [];
     
+    // Helper to get user display name
+    const getUserDisplayName = (userId: string | number): string => {
+      const safeId = typeof userId === 'string' ? userId : String(userId);
+      const userObj = users.find(u => u.id === safeId);
+      if (userObj && typeof userObj.name === 'string' && userObj.name.length > 0) {
+        return userObj.name;
+      }
+      return safeId;
+    };
+    
     // Recent assessments
     if (Array.isArray(assessments)) {
       assessments.slice(0, 10).forEach(assessment => {
         const userId = typeof assessment.userId === 'string' ? assessment.userId : String(assessment.userId);
+        const userName = getUserDisplayName(userId);
         activities.push({
           type: 'assessment',
-          message: `User ${userId.slice(0, 8)} completed mental health assessment`,
+          message: `${userName} completed mental health assessment`,
           timestamp: assessment.timestamp,
           riskLevel: assessment.riskLevel,
           userId
@@ -494,9 +550,10 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     if (Array.isArray(chatMessages)) {
       chatMessages.slice(0, 5).forEach(message => {
         const userId = typeof message.userId === 'string' ? message.userId : String(message.userId);
+        const userName = getUserDisplayName(userId);
         activities.push({
           type: 'chat',
-          message: `User ${userId.slice(0, 8)} sent support message`,
+          message: `${userName} sent support message`,
           timestamp: message.timestamp,
           userId
         });
@@ -791,8 +848,11 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
       assessments,
       chatMessages,
       systemMetrics,
+      systemSettings,
       submitAssessment,
       submitChatMessage,
+      markChatMessageHandled,
+      clearChatMessagesForUser,
       getUserAssessments,
       getAllUsers,
       updateUserStatus,
@@ -804,6 +864,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
       getReviews,
       submitReview,
       updateReview,
+      deleteReview,
       getAnalytics,
           updateSystemMetrics,
           refreshData,

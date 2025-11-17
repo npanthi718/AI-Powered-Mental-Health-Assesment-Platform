@@ -22,7 +22,10 @@ import {
   Warning,
   Info,
   Timeline,
-  Assessment
+  Assessment,
+  Videocam,
+  Visibility,
+  Insights
 } from '@mui/icons-material';
 import {
   RadarChart,
@@ -259,6 +262,63 @@ const AssessmentResults: React.FC<AssessmentResultsProps> = ({ result, showCompa
               </Card>
             </Grid>
           </Grid>
+        </Paper>
+      )}
+
+      {result.activityMonitoring && (
+        <Paper sx={{ mt: 4, p: 3 }}>
+          <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Videocam />
+            Live Activity Monitoring
+          </Typography>
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={4}>
+              <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Insights fontSize="small" />
+                Average Engagement
+              </Typography>
+              <Typography variant="h4">
+                {result.activityMonitoring.averageEngagement.toFixed(1)}%
+              </Typography>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Visibility fontSize="small" />
+                Attention Stability
+              </Typography>
+              <Typography variant="h4">
+                {result.activityMonitoring.averageAttention.toFixed(1)}%
+              </Typography>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <Typography variant="body2" color="text.secondary">
+                Dominant Emotion
+              </Typography>
+              <Chip
+                label={result.activityMonitoring.dominantEmotion}
+                color="primary"
+                sx={{ textTransform: 'capitalize', mt: 1 }}
+              />
+            </Grid>
+          </Grid>
+          {result.activityMonitoring.insights.length > 0 && (
+            <>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="subtitle2" gutterBottom>
+                Recent Monitoring Insights
+              </Typography>
+              <List dense>
+                {result.activityMonitoring.insights.map((insight, idx) => (
+                  <ListItem key={`${insight}-${idx}`}>
+                    <ListItemIcon>
+                      <Insights color="primary" />
+                    </ListItemIcon>
+                    <ListItemText primary={insight} />
+                  </ListItem>
+                ))}
+              </List>
+            </>
+          )}
         </Paper>
       )}
 

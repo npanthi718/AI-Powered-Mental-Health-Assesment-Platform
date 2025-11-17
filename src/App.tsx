@@ -10,6 +10,8 @@ import Register from './components/Auth/Register';
 import UserDashboard from './components/User/UserDashboard';
 import AdminDashboard from './components/Admin/AdminDashboard';
 import SystemInsights from './components/System/SystemInsights';
+import PrivacyPolicy from './components/Legal/PrivacyPolicy';
+import TermsOfService from './components/Legal/TermsOfService';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import './App.css';
 
@@ -157,6 +159,8 @@ function App() {
                     </ProtectedRoute>
                   } 
                 />
+                <Route path="/privacy" element={<PrivacyPolicy />} />
+                <Route path="/terms" element={<TermsOfService />} />
               </Routes>
             </div>
           </Router>
